@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>TS Wallet - Premium Debt Tracker</title>
+    <!-- Firebase SDK (optional) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        /* Light mode (default) */
+        :root {
+            --bg-gradient-start: #667eea;
+            --bg-gradient-end: #764ba2;
+            --card-bg: rgba(255,255,255,0.95);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e9ecef;
+            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --header-text: white;
+            --debt-item-bg: white;
+            --debt-item-hover: #f1f5f9;
+            --positive-color: #22C55E;
+            --negative-color: #EF4444;
+            --rate-bg: rgba(0,0,0,0.1);
+            --settings-bg: #f8fafc;
+            --modal-bg: white;
+            --nav-bg: white;
+            --gold: #D4AF37;
+            --avatar-bg: #1E293B;
+        }
+
+        /* Dark mode */
+        body.dark {
+            --bg-gradient-start: #0f0c29;
+            --bg-gradient-end: #1a1a3e;
+            --card-bg: rgba(0, 0, 0, 0.85);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --header-bg: linear-gradient(135deg, #0f0c29 0%, #1e1b4b 100%);
+            --header-text: #e2e8f0;
+            --debt-item-bg: #1e293b;
+            --debt-item-hover: #334155;
+            --positive-color: #34d399;
+            --negative-color: #f87171;
+            --rate-bg: rgba(255,255,255,0.1);
+            --settings-bg: #0f172a;
+            --modal-bg: #1e293b;
+            --nav-bg: #0f172a;
+            --gold: #FBBF24;
+            --avatar-bg: #334155;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            padding: 20px 0 80px 0;
+            position: relative;
+        }
+
+        /* Dollar rain */
+        .dollar-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .dollar {
+            position: absolute;
+            top: -50px;
+            font-size: 24px;
+            animation: fall linear infinite;
+            opacity: 0.3;
+        }
+        @keyframes fall {
+            0% { top: -50px; transform: rotate(0deg); }
+            100% { top: 100%; transform: rotate(360deg); }
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Header */
+        .header {
+            background: var(--header-bg);
+            padding: 24px 20px;
+            color: var(--header-text);
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .lang-currency {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .lang-btn, .theme-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s;
+        }
+        .lang-btn { padding: 6px 12px; border-radius: 30px; }
+        .theme-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .lang-btn.active { background: white; color: #667eea; }
+        #currencySelect {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        #currencySelect option { background: #667eea; color: white; }
+
+        /* Main Balance */
+        .main-balance {
+            text-align: center;
+            margin: 15px 0 20px;
+        }
+        .main-balance .label {
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.7);
+        }
+        .main-balance .amount {
+            font-size: 44px;
+            font-weight: 800;
+            color: var(--gold);
+            text-shadow: 0 0 15px rgba(212,175,55,0.4);
+            line-height: 1.2;
+        }
+
+        /* Rate info */
+        .rate-info {
+            background: var(--rate-bg);
+            border-radius: 30px;
+            padding: 8px 16px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        /* Balance Cards */
+        .balance-row {
+            display: flex;
+            gap: 15px;
+        }
+        .balance-card {
+            flex: 1;
+            background: linear-gradient(135deg, rgba(212,175,55,0.2), rgba(0,0,0,0.2));
+            border-radius: 24px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px solid rgba(212,175,55,0.3);
+            transition: 0.2s;
+        }
+        .balance-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .balance-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .balance-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Pages */
+        .page { display: none; padding: 20px; }
+        .page.active { display: block; }
+
+        /* Debt List */
+        .debt-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .debt-item {
+            background: var(--debt-item-bg);
+            border-radius: 20px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            transition: transform 0.1s ease, background 0.2s;
+        }
+        .debt-item:active { transform: scale(0.98); }
+        .debt-item:hover { background: var(--debt-item-hover); }
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--avatar-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-weight: 700;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .debt-info { flex: 1; }
+        .debt-name { font-size: 16px; font-weight: 600; }
+        .debt-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .debt-amount { font-size: 16px; font-weight: 700; }
+        .delete-btn {
+            background: rgba(239,68,68,0.2);
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+        .delete-btn:hover { background: rgba(239,68,68,0.5); transform: scale(1.05); }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 85px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: 0.3s;
+            z-index: 200;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            border: none;
+        }
+        .fab:hover { transform: scale(1.08); }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-card {
+            background: var(--modal-bg);
+            color: var(--text-primary);
+            width: 90%;
+            max-width: 500px;
+            border-radius: 36px;
+            padding: 28px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-card h3 { font-size: 24px; margin-bottom: 20px; }
+        .debt-type-select {
+            display: flex;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .type-option {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 40px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .type-option.receivable { background: #f0fdf4; color: #10b981; }
+        .type-option.payable { background: #fef2f2; color: #ef4444; }
+        .type-option.selected { border-color: currentColor; background: white; }
+        body.dark .type-option.receivable { background: #064e3b; color: #34d399; }
+        body.dark .type-option.payable { background: #7f1d1d; color: #f87171; }
+        body.dark .type-option.selected { background: #1e293b; }
+        .currency-select {
+            display: flex;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .currency-select select, .currency-select input {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 28px;
+            font-size: 16px;
+            background: var(--modal-bg);
+            color: var(--text-primary);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .action-btn:active { transform: scale(0.97); }
+        .minus-btn { background: #fee2e2; color: #ef4444; }
+        .plus-btn { background: #d1fae5; color: #10b981; }
+        .comment-input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 28px;
+            font-size: 14px;
+            margin: 12px 0;
+            background: var(--modal-bg);
+            color: var(--text-primary);
+        }
+        .quick-btns {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .quick-btn {
+            flex: 1;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+        }
+        body.dark .quick-btn { background: #334155; color: white; }
+        .transaction-list {
+            max-height: 250px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+        }
+        .transaction-item {
+            background: rgba(0,0,0,0.05);
+            border-radius: 20px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        body.dark .transaction-item { background: rgba(255,255,255,0.05); }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .cancel-btn, .save-btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            transition: 0.1s;
+        }
+        .cancel-btn:active, .save-btn:active { transform: scale(0.97); }
+        .cancel-btn { background: #e2e8f0; color: #1e293b; }
+        .save-btn { background: #667eea; color: white; }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--nav-bg);
+            display: flex;
+            padding: 12px 20px;
+            box-shadow: 0 -8px 25px rgba(0,0,0,0.15);
+            border-radius: 35px 35px 0 0;
+            z-index: 100;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+            border-radius: 40px;
+            transition: 0.2s;
+        }
+        .nav-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Settings */
+        .settings-card {
+            background: var(--settings-bg);
+            border-radius: 28px;
+            padding: 24px;
+        }
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+        .backup-section {
+            background: var(--debt-item-bg);
+            border-radius: 24px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .backup-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .backup-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.1s;
+        }
+        .backup-btn:active { transform: scale(0.97); }
+        .export-btn { background: #10b981; color: white; }
+        .import-btn { background: #3b82f6; color: white; }
+        .copy-all-btn { background: #8b5cf6; color: white; }
+        .rate-input-group {
+            display: flex;
+            gap: 8px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .rate-input-group input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            background: var(--modal-bg);
+            color: var(--text-primary);
+        }
+        .save-rate-btn, .refresh-rate {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        canvas { max-height: 200px; margin: 20px 0; }
+        .sync-status { font-size: 10px; margin-left: 8px; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 2px 10px; }
+
+        /* PIN modal */
+        .pin-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .pin-box {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 40px;
+            text-align: center;
+            max-width: 300px;
+            width: 80%;
+        }
+        .pin-box input {
+            font-size: 32px;
+            letter-spacing: 10px;
+            text-align: center;
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 20px;
+            border: 2px solid var(--gold);
+            background: var(--modal-bg);
+            color: var(--text-primary);
+        }
+        .reminder-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        .reminder-time {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dollar-rain" id="dollarRain"></div>
+
+<div class="app">
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">💰 TS Wallet</div>
+            <div class="lang-currency">
+                <button class="lang-btn" data-lang="az">AZ</button>
+                <button class="lang-btn" data-lang="ru">RU</button>
+                <button class="lang-btn" data-lang="en">EN</button>
+                <button class="theme-btn" id="themeToggle">🌓</button>
+                <select id="currencySelect">
+                    <option value="AZN">🇦🇿 AZN</option>
+                    <option value="USD">🇺🇸 USD</option>
+                    <option value="EUR">🇪🇺 EUR</option>
+                    <option value="TRY">🇹🇷 TRY</option>
+                    <option value="RUB">🇷🇺 RUB</option>
+                </select>
+            </div>
+        </div>
+        <div class="main-balance">
+            <div class="label" id="totalBalanceLabel">ÜMUMİ BALANS</div>
+            <div class="amount" id="totalBalanceAmount">₼ 0</div>
+        </div>
+        <div class="rate-info" id="rateInfo"><span>💵 USD: 1.70</span><span>💶 EUR: 1.85</span><span>🇹🇷 TRY: 0.05</span><span>🇷🇺 RUB: 0.018</span></div>
+        <div class="balance-row">
+            <div class="balance-card" data-page="balance"><div class="balance-label" id="youAreOwedLabel">Mənə borc</div><div class="balance-value positive" id="headerReceivable">0</div></div>
+            <div class="balance-card" data-page="balance"><div class="balance-label" id="youOweLabel">Mən borcluyam</div><div class="balance-value negative" id="headerPayable">0</div></div>
+            <div class="balance-card" data-page="balance"><div class="balance-label" id="netLabel">Net</div><div class="balance-value" id="headerNet">0</div></div>
+        </div>
+    </div>
+
+    <div id="peoplePage" class="page active"><div id="debtListContainer" class="debt-list"></div></div>
+    <div id="balancePage" class="page">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 28px; padding: 20px; color: white;">
+            <h3 id="overviewTitle">Ümumi baxış</h3>
+            <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                <div><div id="largestOwedTitle">Ən böyük alacaq</div><strong id="largestOwedName">—</strong><br><span id="largestOwedAmount">0</span></div>
+                <div><div id="largestPayableTitle">Ən böyük borc</div><strong id="largestPayableName">—</strong><br><span id="largestPayableAmount">0</span></div>
+            </div>
+        </div>
+        <canvas id="debtChart" width="400" height="200"></canvas>
+        <div style="background: var(--debt-item-bg); border-radius: 24px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;"><span id="youAreOwedSmall">Mənə borc</span><strong class="positive" id="chartReceivable">0</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span id="youOweSmall">Mən borcluyam</span><strong class="negative" id="chartPayable">0</strong></div>
+        </div>
+    </div>
+    <div id="settingsPage" class="page">
+        <div class="settings-card">
+            <h3 id="settingsTitle">Ayarlar</h3>
+            <div class="setting-item" id="currencySetting"><span>💱 Currency</span><span>→</span></div>
+            <div class="setting-item" id="languageSetting"><span>🌐 Language</span><span>→</span></div>
+            <div class="setting-item" id="darkModeSetting"><span>🌙 Dark Mode</span><span>→</span></div>
+            <div class="setting-item" id="syncSetting"><span>☁️ Sync Data</span><span>→</span></div>
+            <div class="setting-item" id="pinSetting"><span>🔐 Face ID & Passcode</span><span>→</span></div>
+            <div class="setting-item" id="reminderSetting"><span>⏰ Reminder (Borc xatırlatması)</span><span>→</span></div>
+            <div class="setting-item" id="aboutSetting"><span>ℹ️ About</span><span>→</span></div>
+            
+            <div class="backup-section">
+                <h4>💾 Backup & Copy</h4>
+                <div class="backup-buttons">
+                    <button class="backup-btn export-btn" id="exportBackupBtn">📤 Export</button>
+                    <button class="backup-btn import-btn" id="importBackupBtn">📥 Import</button>
+                    <button class="backup-btn copy-all-btn" id="copyAllDataBtn">📋 Copy all data</button>
+                </div>
+                <input type="file" id="backupFileInput" class="file-input" accept=".json">
+                <div class="auto-backup-info" id="autoBackupInfo">💾 Auto-backup active</div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h4>💱 Exchange rates (1 AZN)</h4>
+                <div id="currencyRatesList">1 AZN = 1.70 USD<br>1 AZN = 1.85 EUR<br>1 AZN = 0.05 TRY<br>1 AZN = 0.018 RUB</div>
+                <div class="rate-input-group">
+                    <input type="number" id="customUSD" step="0.01" placeholder="USD">
+                    <input type="number" id="customEUR" step="0.01" placeholder="EUR">
+                    <input type="number" id="customTRY" step="0.01" placeholder="TRY">
+                    <input type="number" id="customRUB" step="0.01" placeholder="RUB">
+                    <button class="save-rate-btn" id="saveCustomRatesBtn">Apply</button>
+                </div>
+                <button class="refresh-rate" id="resetDefaultRatesBtn">Reset defaults</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <button class="nav-item active" data-page="people">👥 <span id="debtsNav">Borclar</span></button>
+    <button class="nav-item" data-page="balance">📊 <span id="balanceNav">Balans</span></button>
+    <button class="nav-item" data-page="settings">⚙️ <span id="settingsNav">Ayarlar</span></button>
+</div>
+<button class="fab" id="openNewDebtModal">+</button>
+
+<!-- Modals -->
+<div id="debtModal" class="modal"><div class="modal-card"><h3 id="newDebtTitle">Yeni borc</h3><input type="text" id="debtName" placeholder="Ad Soyad" style="width:100%; padding:14px; border-radius:28px; border:2px solid #e2e8f0; margin-bottom:12px;"><div class="debt-type-select"><div class="type-option receivable" data-type="receivable">📥 Mənə borc</div><div class="type-option payable" data-type="payable">📤 Mən borcluyam</div></div><div class="currency-select"><select id="debtCurrency"><option value="AZN">🇦🇿 AZN</option><option value="USD">🇺🇸 USD</option><option value="EUR">🇪🇺 EUR</option><option value="TRY">🇹🇷 TRY</option><option value="RUB">🇷🇺 RUB</option></select><input type="number" id="debtAmount" placeholder="Məbləğ" step="0.01"></div><div class="modal-actions"><button class="cancel-btn" id="closeModalBtn">Ləğv et</button><button class="save-btn" id="saveDebtBtn">Əlavə et</button></div></div></div>
+
+<div id="editDebtModal" class="modal"><div class="modal-card"><h3 id="editDebtName">Ad</h3><div class="current-debt" id="editCurrentAmount">0</div><div class="currency-select"><select id="editCurrency"><option value="AZN">AZN</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="TRY">TRY</option><option value="RUB">RUB</option></select><input type="number" id="transactionAmount" placeholder="Məbləğ" step="0.01" value="1"></div><div class="action-buttons"><button class="action-btn minus-btn" id="detailDecrement">− <span id="decreaseBtn">Azalt</span></button><button class="action-btn plus-btn" id="detailIncrement">+ <span id="increaseBtn">Artır</span></button></div><textarea id="transactionComment" class="comment-input" rows="2" placeholder="Şərh..."></textarea><div class="quick-btns"><button class="quick-btn" data-comment="Nağd pul">💰 Nağd</button><button class="quick-btn" data-comment="Bank köçürməsi">🏦 Bank</button><button class="quick-btn" data-comment="Hissə ödəniş">📉 Hissə</button><button class="quick-btn" data-comment="Tam ödəniş">✅ Tam</button></div><div class="transaction-list" id="transactionList"></div><div class="modal-actions"><button class="cancel-btn" id="closeEditModalBtn">Bağla</button></div></div></div>
+
+<!-- PIN modal -->
+<div id="pinModal" class="pin-modal" style="display: none;">
+    <div class="pin-box">
+        <h3>🔐 PIN kod</h3>
+        <input type="password" id="pinInput" maxlength="4" pattern="\d*" inputmode="numeric" placeholder="****">
+        <div class="modal-actions">
+            <button id="pinSubmitBtn" class="save-btn">Daxil ol</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reminder modal -->
+<div id="reminderModal" class="modal">
+    <div class="modal-card">
+        <h3>⏰ Borc xatırlatması</h3>
+        <p>Hər gün saat:</p>
+        <input type="time" id="reminderTime" value="09:00">
+        <div class="modal-actions">
+            <button id="saveReminderBtn" class="save-btn">Yadda saxla</button>
+            <button id="closeReminderBtn" class="cancel-btn">Bağla</button>
+        </div>
+        <p style="font-size:12px; margin-top:10px;">Bildiriş icazəsi tələb olunur. Xatırlatma vaxtı gələndə borclarınızı yoxlamaq üçün bildiriş göndəriləcək.</p>
+    </div>
+</div>
+
+<script>
+    // ========== FIREBASE (optional) ==========
+    const firebaseConfig = {};
+    let syncEnabled = false;
+
+    // ========== DİL & TƏRCÜMƏ ==========
+    const translations = {
+        az: {
+            total_balance: "ÜMUMİ BALANS", you_are_owed: "Mənə borc", you_owe: "Mən borcluyam", net: "Net",
+            overview: "Ümumi baxış", largest_owed: "Ən böyük alacaq", largest_payable: "Ən böyük borc",
+            debts: "Borclar", balance: "Balans", settings: "Ayarlar", new_debt: "Yeni borc",
+            cancel: "Ləğv et", save: "Əlavə et", decrease: "Azalt", increase: "Artır", close: "Bağla",
+            comment_placeholder: "Şərh...", cash: "Nağd", bank: "Bank", partial: "Hissə", full: "Tam",
+            settings_title: "Ayarlar", about_text: "TS Wallet - Borc izləmə tətbiqi\nVersiya 2.0"
+        },
+        ru: {
+            total_balance: "ОБЩИЙ БАЛАНС", you_are_owed: "Мне должны", you_owe: "Я должен", net: "Баланс",
+            overview: "Обзор", largest_owed: "Самый большой долг мне", largest_payable: "Самый большой мой долг",
+            debts: "Долги", balance: "Баланс", settings: "Настройки", new_debt: "Новый долг",
+            cancel: "Отмена", save: "Сохранить", decrease: "Уменьшить", increase: "Увеличить", close: "Закрыть",
+            comment_placeholder: "Комментарий...", cash: "Наличные", bank: "Банк", partial: "Часть", full: "Полностью",
+            settings_title: "Настройки", about_text: "TS Wallet - Приложение для учёта долгов\nВерсия 2.0"
+        },
+        en: {
+            total_balance: "TOTAL BALANCE", you_are_owed: "You are owed", you_owe: "You owe", net: "Net",
+            overview: "Overview", largest_owed: "Largest debt owed", largest_payable: "Largest debt you owe",
+            debts: "Debts", balance: "Balance", settings: "Settings", new_debt: "New Debt",
+            cancel: "Cancel", save: "Save", decrease: "Decrease", increase: "Increase", close: "Close",
+            comment_placeholder: "Comment...", cash: "Cash", bank: "Bank", partial: "Partial", full: "Full",
+            settings_title: "Settings", about_text: "TS Wallet - Debt tracking app\nVersion 2.0"
+        }
+    };
+    let currentLang = 'az';
+    function updateUILang() {
+        let t = translations[currentLang];
+        document.getElementById('totalBalanceLabel').innerText = t.total_balance;
+        document.getElementById('youAreOwedLabel').innerText = t.you_are_owed;
+        document.getElementById('youOweLabel').innerText = t.you_owe;
+        document.getElementById('netLabel').innerText = t.net;
+        document.getElementById('overviewTitle').innerText = t.overview;
+        document.getElementById('largestOwedTitle').innerText = t.largest_owed;
+        document.getElementById('largestPayableTitle').innerText = t.largest_payable;
+        document.getElementById('debtsNav').innerText = t.debts;
+        document.getElementById('balanceNav').innerText = t.balance;
+        document.getElementById('settingsNav').innerText = t.settings;
+        document.getElementById('newDebtTitle').innerText = t.new_debt;
+        document.getElementById('settingsTitle').innerText = t.settings_title;
+        document.getElementById('decreaseBtn').innerText = t.decrease;
+        document.getElementById('increaseBtn').innerText = t.increase;
+        document.getElementById('closeEditModalBtn').innerText = t.close;
+        document.getElementById('closeModalBtn').innerText = t.cancel;
+        document.getElementById('saveDebtBtn').innerText = t.save;
+        document.querySelectorAll('[data-comment-text]').forEach(el => {});
+        let ph = document.getElementById('transactionComment');
+        if(ph) ph.placeholder = t.comment_placeholder;
+    }
+    function setLanguage(lang) { currentLang = lang; updateUILang(); renderAll(); document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lang === lang)); }
+
+    // ========== VALYUTA ==========
+    let exchangeRates = { AZN: 1, USD: 1.70, EUR: 1.85, TRY: 0.05, RUB: 0.018 };
+    let currentDisplayCurrency = 'AZN';
+    function toAZN(amount, fromCurr) { if (fromCurr === 'AZN') return amount; return amount * exchangeRates[fromCurr]; }
+    function fromAZN(amountAZN, toCurr) { if (toCurr === 'AZN') return amountAZN; return amountAZN / exchangeRates[toCurr]; }
+    function formatMoney(amountAZN, curr) { let val = fromAZN(amountAZN, curr); let sym = { AZN:'₼', USD:'$', EUR:'€', TRY:'₺', RUB:'₽' }; return `${val.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} ${sym[curr] || curr}`; }
+    function getDateTime() { let d = new Date(); return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`; }
+
+    // ========== DATA ==========
+    let debts = [];
+    let currentEditDebtId = null;
+    let selectedDebtType = 'receivable';
+    const STORAGE_KEY = 'ts_wallet_v2';
+    let chartInstance = null;
+
+    function saveToLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(debts)); }
+    function loadFromLocal() {
+        let stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) { try { debts = JSON.parse(stored); debts.forEach(d => { if (!d.transactions) d.transactions = []; }); } catch(e) { debts = []; } }
+        else debts = [];
+        renderAll();
+    }
+    function updateAll() { renderAll(); saveToLocal(); }
+
+    // Azalt/Artır məntiqi (isIncrease = true -> məbləği artır, false -> azaldır)
+    function updateDebtAmount(debtId, amountAZN, isIncrease) {
+        let idx = debts.findIndex(d => d.id === debtId);
+        if (idx === -1) return false;
+        let current = debts[idx].amount;
+        let sign = Math.sign(current);
+        if (sign === 0) sign = 1;
+        let newAmount;
+        if (isIncrease) newAmount = current + sign * amountAZN;
+        else newAmount = current - sign * amountAZN;
+        if (Math.abs(newAmount) < 0.01) newAmount = 0;
+        if (newAmount === 0) {
+            if (confirm('Bu borcu silmək istəyirsiniz?')) { debts.splice(idx, 1); updateAll(); closeEditModal(); return true; }
+            else return false;
+        }
+        debts[idx].amount = newAmount;
+        if (!debts[idx].transactions) debts[idx].transactions = [];
+        let comment = document.getElementById('transactionComment').value || (isIncrease ? 'Artırma' : 'Azaltma');
+        debts[idx].transactions.push({ id: Date.now(), dateStr: getDateTime(), delta: newAmount - current, newBalance: newAmount, comment: comment });
+        updateAll();
+        return true;
+    }
+
+    function addNewDebt(name, amount, currency, type) {
+        if (!name.trim()) { alert('Ad daxil edin'); return false; }
+        let num = parseFloat(amount);
+        if (isNaN(num) || num === 0) { alert('Məbləğ daxil edin'); return false; }
+        let azn = toAZN(Math.abs(num), currency);
+        let final = type === 'receivable' ? azn : -azn;
+        let newDebt = { id: Date.now(), name: name.trim(), amount: final, currency: currency, transactions: [] };
+        newDebt.transactions.push({ id: Date.now(), dateStr: getDateTime(), delta: final, newBalance: final, comment: 'İlkin' });
+        debts.push(newDebt);
+        updateAll();
+        return true;
+    }
+
+    // UI render
+    function renderAll() {
+        renderDebtList();
+        renderBalanceCards();
+        renderTotalBalance();
+        renderLargestDebts();
+        updateChart();
+    }
+    function renderDebtList() {
+        let container = document.getElementById('debtListContainer');
+        if (!container) return;
+        if (debts.length === 0) {
+            container.innerHTML = `<div class="empty-state"><h3>💰 Borc yoxdur</h3><p>+ düyməsi ilə əlavə edin</p></div>`;
+            return;
+        }
+        let html = '';
+        debts.forEach(d => {
+            let isPos = d.amount > 0;
+            let sign = isPos ? '+' : '';
+            let cls = isPos ? 'positive' : 'negative';
+            let amt = formatMoney(Math.abs(d.amount), currentDisplayCurrency);
+            let letter = d.name.charAt(0).toUpperCase();
+            html += `<div class="debt-item" data-id="${d.id}"><div class="avatar">${letter}</div><div class="debt-info"><div class="debt-name">${escapeHtml(d.name)}</div></div><div class="debt-right"><span class="debt-amount ${cls}">${sign}${amt}</span><button class="delete-btn" data-id="${d.id}">🗑️</button></div></div>`;
+        });
+        container.innerHTML = html;
+        document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); let id = parseInt(btn.dataset.id); if(confirm('Sil?')) { debts = debts.filter(d => d.id !== id); updateAll(); if(currentEditDebtId === id) closeEditModal(); } }));
+        document.querySelectorAll('.debt-item').forEach(item => item.addEventListener('click', (e) => { if(e.target.classList.contains('delete-btn')) return; openEditModal(parseInt(item.dataset.id)); }));
+    }
+    function renderBalanceCards() {
+        let totalAZN=0, rec=0, pay=0;
+        debts.forEach(d => { totalAZN+=d.amount; if(d.amount>0) rec+=d.amount; else pay+=Math.abs(d.amount); });
+        document.getElementById('headerReceivable').innerHTML = `+ ${formatMoney(rec, currentDisplayCurrency)}`;
+        document.getElementById('headerPayable').innerHTML = `- ${formatMoney(pay, currentDisplayCurrency)}`;
+        document.getElementById('headerNet').innerHTML = totalAZN >= 0 ? `+ ${formatMoney(totalAZN, currentDisplayCurrency)}` : `- ${formatMoney(Math.abs(totalAZN), currentDisplayCurrency)}`;
+        document.getElementById('chartReceivable').innerHTML = formatMoney(rec, currentDisplayCurrency);
+        document.getElementById('chartPayable').innerHTML = formatMoney(pay, currentDisplayCurrency);
+    }
+    function renderTotalBalance() { let total = debts.reduce((s,d)=>s+d.amount,0); document.getElementById('totalBalanceAmount').innerHTML = formatMoney(total, currentDisplayCurrency); }
+    function renderLargestDebts() {
+        let owed = debts.filter(d => d.amount > 0).sort((a,b)=>b.amount - a.amount)[0];
+        let payable = debts.filter(d => d.amount < 0).sort((a,b)=>a.amount - b.amount)[0];
+        document.getElementById('largestOwedName').innerText = owed ? owed.name : '—';
+        document.getElementById('largestOwedAmount').innerHTML = owed ? formatMoney(owed.amount, currentDisplayCurrency) : '0';
+        document.getElementById('largestPayableName').innerText = payable ? payable.name : '—';
+        document.getElementById('largestPayableAmount').innerHTML = payable ? formatMoney(Math.abs(payable.amount), currentDisplayCurrency) : '0';
+    }
+    function updateChart() {
+        let rec = debts.filter(d=>d.amount>0).reduce((s,d)=>s+d.amount,0);
+        let pay = debts.filter(d=>d.amount<0).reduce((s,d)=>s+Math.abs(d.amount),0);
+        let ctx = document.getElementById('debtChart').getContext('2d');
+        if(chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: [translations[currentLang].you_are_owed, translations[currentLang].you_owe], datasets: [{ data: [rec, pay], backgroundColor: ['#22C55E', '#EF4444'], borderWidth: 0 }] }, options: { responsive: true, cutout: '60%' } });
+    }
+    function openEditModal(id) {
+        let debt = debts.find(d=>d.id===id);
+        if(!debt) return;
+        currentEditDebtId = id;
+        document.getElementById('editDebtName').innerText = debt.name;
+        document.getElementById('editCurrency').value = debt.currency || 'AZN';
+        document.getElementById('editCurrentAmount').innerHTML = formatMoney(Math.abs(debt.amount), currentDisplayCurrency) + (debt.amount>0 ? ' (alacaq)' : ' (borc)');
+        renderHistory(debt);
+        document.getElementById('editDebtModal').style.display = 'flex';
+        document.getElementById('transactionComment').value = '';
+        document.getElementById('transactionAmount').value = '1';
+    }
+    function renderHistory(debt) {
+        let container = document.getElementById('transactionList');
+        if(!debt.transactions || debt.transactions.length===0) { container.innerHTML = '<div style="text-align:center; padding:16px;">Heç bir əməliyyat yoxdur</div>'; return; }
+        let html = '';
+        [...debt.transactions].reverse().forEach(t => {
+            let sign = t.delta>0 ? '+' : '-';
+            html += `<div class="transaction-item"><div>${sign}${formatMoney(Math.abs(t.delta), currentDisplayCurrency)} → ${formatMoney(t.newBalance, currentDisplayCurrency)}</div><div class="trans-date">📅 ${t.dateStr}</div><div class="trans-comment">💬 ${escapeHtml(t.comment)}</div></div>`;
+        });
+        container.innerHTML = html;
+    }
+    function setCurrency(curr) { currentDisplayCurrency = curr; renderAll(); }
+    function closeEditModal() { document.getElementById('editDebtModal').style.display = 'none'; currentEditDebtId = null; }
+    function showPage(page) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(page + 'Page').classList.add('active'); document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page)); if(page === 'balance') updateChart(); }
+    function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
+
+    // Backup & Copy
+    function exportBackup() { let data = JSON.stringify({debts, exchangeRates}, null,2); let blob = new Blob([data], {type:'application/json'}); let a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`backup_${Date.now()}.json`; a.click(); URL.revokeObjectURL(blob); }
+    function importBackup(file) { let reader = new FileReader(); reader.onload = e => { try { let d=JSON.parse(e.target.result); if(d.debts) debts=d.debts; if(d.exchangeRates) exchangeRates=d.exchangeRates; updateAll(); alert('Bərpa edildi'); } catch(err) { alert('Xəta'); } }; reader.readAsText(file); }
+    function copyAllData() { let txt = JSON.stringify({debts, exchangeRates}, null,2); navigator.clipboard.writeText(txt).then(()=>alert('Bütün məlumatlar kopyalandı')); }
+
+    // ========== PIN KOD ==========
+    let pinCode = localStorage.getItem('pin_code') || '0000';
+    let isVerified = false;
+    function showPinModal() {
+        document.getElementById('pinModal').style.display = 'flex';
+        document.getElementById('pinInput').value = '';
+        document.getElementById('pinInput').focus();
+    }
+    function verifyPin() {
+        let entered = document.getElementById('pinInput').value;
+        if (entered === pinCode) {
+            document.getElementById('pinModal').style.display = 'none';
+            isVerified = true;
+            loadFromLocal();
+        } else {
+            alert('Yanlış PIN!');
+        }
+    }
+    function changePin() {
+        let newPin = prompt('Yeni 4 rəqəmli PIN kod daxil edin', '0000');
+        if (newPin && newPin.length === 4 && /^\d+$/.test(newPin)) {
+            pinCode = newPin;
+            localStorage.setItem('pin_code', pinCode);
+            alert('PIN kod dəyişdirildi');
+        } else alert('4 rəqəm daxil edin');
+    }
+
+    // ========== REMINDER (Bildiriş) ==========
+    let reminderTime = localStorage.getItem('reminder_time') || '09:00';
+    function requestNotificationPermission() {
+        if ('Notification' in window) {
+            Notification.requestPermission();
+        }
+    }
+    function scheduleReminder() {
+        let time = document.getElementById('reminderTime').value;
+        reminderTime = time;
+        localStorage.setItem('reminder_time', reminderTime);
+        alert(`Xatırlatma vaxtı ${reminderTime} təyin edildi.`);
+        // Sadəcə xatırlatma funksiyası: interval yoxlaması (real tətbiq üçün daha yaxşı)
+        if ('Notification' in window && Notification.permission === 'granted') {
+            // Nümunə: hər dəqiqə yoxlama (yalnız demo)
+            if (window.reminderInterval) clearInterval(window.reminderInterval);
+            window.reminderInterval = setInterval(() => {
+                let now = new Date();
+                let current = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+                if (current === reminderTime) {
+                    new Notification('Borc xatırlatması', { body: 'Borclarınızı yoxlamağı unutmayın!' });
+                }
+            }, 60000);
+        } else {
+            requestNotificationPermission();
+        }
+    }
+
+    // Event listeners
+    document.getElementById('openNewDebtModal').onclick = () => { selectedDebtType = 'receivable'; document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected')); document.querySelector('.type-option.receivable').classList.add('selected'); document.getElementById('debtModal').style.display = 'flex'; };
+    document.querySelectorAll('.type-option').forEach(opt => opt.onclick = function() { document.querySelectorAll('.type-option').forEach(o=>o.classList.remove('selected')); this.classList.add('selected'); selectedDebtType = this.dataset.type; });
+    document.getElementById('closeModalBtn').onclick = () => document.getElementById('debtModal').style.display = 'none';
+    document.getElementById('closeEditModalBtn').onclick = closeEditModal;
+    document.getElementById('saveDebtBtn').onclick = () => { let n = document.getElementById('debtName').value, a = document.getElementById('debtAmount').value, c = document.getElementById('debtCurrency').value; if(addNewDebt(n,a,c,selectedDebtType)) { document.getElementById('debtModal').style.display = 'none'; document.getElementById('debtName').value = ''; document.getElementById('debtAmount').value = ''; } };
+    document.getElementById('detailDecrement').onclick = () => { let amt = parseFloat(document.getElementById('transactionAmount').value), curr = document.getElementById('editCurrency').value; if(!isNaN(amt) && amt>0) updateDebtAmount(currentEditDebtId, toAZN(amt, curr), false); else alert('Məbləğ daxil edin'); };
+    document.getElementById('detailIncrement').onclick = () => { let amt = parseFloat(document.getElementById('transactionAmount').value), curr = document.getElementById('editCurrency').value; if(!isNaN(amt) && amt>0) updateDebtAmount(currentEditDebtId, toAZN(amt, curr), true); else alert('Məbləğ daxil edin'); };
+    document.getElementById('exportBackupBtn').onclick = exportBackup;
+    document.getElementById('importBackupBtn').onclick = () => document.getElementById('backupFileInput').click();
+    document.getElementById('copyAllDataBtn').onclick = copyAllData;
+    document.getElementById('backupFileInput').onchange = (e) => { if(e.target.files && e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; };
+    document.getElementById('saveCustomRatesBtn').onclick = () => { let u=parseFloat(document.getElementById('customUSD').value); if(u>0) exchangeRates.USD=u; let e=parseFloat(document.getElementById('customEUR').value); if(e>0) exchangeRates.EUR=e; let t=parseFloat(document.getElementById('customTRY').value); if(t>0) exchangeRates.TRY=t; let r=parseFloat(document.getElementById('customRUB').value); if(r>0) exchangeRates.RUB=r; updateAll(); alert('Kurslar yeniləndi'); };
+    document.getElementById('resetDefaultRatesBtn').onclick = () => { exchangeRates = {AZN:1,USD:1.70,EUR:1.85,TRY:0.05,RUB:0.018}; updateAll(); alert('Defolt kurslar bərpa edildi'); };
+    document.getElementById('currencySelect').onchange = (e) => setCurrency(e.target.value);
+    document.querySelectorAll('.lang-btn').forEach(btn => btn.onclick = () => setLanguage(btn.dataset.lang));
+    document.querySelectorAll('.nav-item').forEach(btn => btn.onclick = () => showPage(btn.dataset.page));
+    document.querySelectorAll('.balance-card').forEach(card => card.onclick = () => showPage('balance'));
+    document.querySelectorAll('.quick-btn').forEach(btn => btn.onclick = () => document.getElementById('transactionComment').value = btn.innerText.trim());
+    document.getElementById('themeToggle').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light'); if(chartInstance) updateChart(); };
+    window.onclick = (e) => { if(e.target.classList.contains('modal')) e.target.style.display = 'none'; };
+
+    // Settings items
+    document.getElementById('pinSetting').onclick = changePin;
+    document.getElementById('aboutSetting').onclick = () => alert(translations[currentLang].about_text);
+    document.getElementById('reminderSetting').onclick = () => { document.getElementById('reminderModal').style.display = 'flex'; };
+    document.getElementById('saveReminderBtn').onclick = () => { scheduleReminder(); document.getElementById('reminderModal').style.display = 'none'; };
+    document.getElementById('closeReminderBtn').onclick = () => document.getElementById('reminderModal').style.display = 'none';
+    document.getElementById('reminderTime').value = reminderTime;
+    document.getElementById('currencySetting').onclick = () => document.getElementById('currencySelect').focus();
+    document.getElementById('languageSetting').onclick = () => { let next = {az:'ru',ru:'en',en:'az'}[currentLang]; setLanguage(next); };
+    document.getElementById('darkModeSetting').onclick = () => document.getElementById('themeToggle').click();
+    document.getElementById('syncSetting').onclick = () => alert('Firebase konfiq daxil edildikdə sinxron işləyəcək');
+
+    function startDollarRain() { let container = document.getElementById('dollarRain'); let sym = ['💵','💶','💷','💴','💰']; for(let i=0;i<40;i++) { let d = document.createElement('div'); d.className='dollar'; d.innerHTML=sym[Math.floor(Math.random()*sym.length)]; d.style.left=Math.random()*100+'%'; d.style.fontSize=(15+Math.random()*30)+'px'; d.style.animationDuration=(3+Math.random()*6)+'s'; d.style.animationDelay=(Math.random()*10)+'s'; container.appendChild(d); } }
+    
+    // Init
+    function init() {
+        if(localStorage.getItem('theme')==='dark') document.body.classList.add('dark');
+        startDollarRain();
+        requestNotificationPermission();
+        // PIN sorğusu
+        showPinModal();
+        document.getElementById('pinSubmitBtn').onclick = verifyPin;
+        document.getElementById('pinInput').addEventListener('keypress', (e) => { if(e.key === 'Enter') verifyPin(); });
+        setLanguage('az');
+        showPage('people');
+    }
+    init();
+</script>
+</body>
+</html>
